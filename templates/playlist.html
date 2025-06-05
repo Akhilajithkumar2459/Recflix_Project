@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>My Playlist</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  {% csrf_token %}
+</head>
+<body class="playlist-bg">
+  <header class="navbar">
+    <div class="logo">RecFlix</div>
+    <nav>
+      <ul>
+        {% if user.is_authenticated %}
+        <li class="dropdown-parent">
+          <span class="user-label">Hi, {{ user.first_name }}</span>
+          <div class="dropdown">
+            <a href="/history">History</a>
+            <a href="/playlist">Playlist</a>
+            <a href="/logout">Logout</a>
+          </div>
+        </li>
+        {% endif %}
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container">
+    <h2>My Playlist</h2>
+
+    <div class="playlist-container">
+      {% if movies %}
+      <div class="playlist-section">
+        <h3>Movies</h3>
+        <div class="playlist-grid">
+          {% for item in movies %}
+          <div class="card playlist-card">
+            <img src="{{ item.poster }}" alt="{{ item.title }}" style="width: 100%; aspect-ratio: 2/3; object-fit: cover;">
+            <div class="movie-overlay">
+              <p>{{ item.title }}</p>
+              <button class="trailer-btn" onclick="showTrailer('{{ item.title }}')">Watch Trailer</button>
+              <button class="remove-btn" onclick="removeFromPlaylist('{{ item.title }}', 'movies')">Remove</button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if anime %}
+      <div class="playlist-section">
+        <h3>Anime</h3>
+        <div class="playlist-grid">
+          {% for item in anime %}
+          <div class="card playlist-card">
+            <img src="{{ item.poster }}" alt="{{ item.title }}" style="width: 100%; aspect-ratio: 2/3; object-fit: cover;">
+            <div class="movie-overlay">
+              <p>{{ item.title }}</p>
+              <button class="trailer-btn" onclick="showTrailer('{{ item.title }}')">Watch Trailer</button>
+              <button class="remove-btn" onclick="removeFromPlaylist('{{ item.title }}', 'anime')">Remove</button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if webseries %}
+      <div class="playlist-section">
+        <h3>Web Series</h3>
+        <div class="playlist-grid">
+          {% for item in webseries %}
+          <div class="card playlist-card">
+            <img src="{{ item.poster }}" alt="{{ item.title }}" style="width: 100%; aspect-ratio: 2/3; object-fit: cover;">
+            <div class="movie-overlay">
+              <p>{{ item.title }}</p>
+              <button class="trailer-btn" onclick="showTrailer('{{ item.title }}')">Watch Trailer</button>
+              <button class="remove-btn" onclick="removeFromPlaylist('{{ item.title }}', 'webseries')">Remove</button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if games %}
+      <div class="playlist-section">
+        <h3>Games</h3>
+        <div class="playlist-grid">
+          {% for item in games %}
+          <div class="card playlist-card" data-title="{{ item.title }}" data-category="games">
+            <img src="{{ item.poster }}" alt="{{ item.title }}" style="width: 100%; aspect-ratio: 2/3; object-fit: cover;">
+            <div class="movie-overlay">
+              <p>{{ item.title }}</p>
+              <button class="trailer-btn" onclick="showTrailer('{{ item.title|escapejs }}')">Watch Trailer</button>
+              <button class="remove-btn" onclick="removeFromPlaylist('{{ item.title|escapejs }}', 'games')">Remove</button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if books %}
+      <div class="playlist-section">
+        <h3>Books</h3>
+        <div class="playlist-grid">
+          {% for item in books %}
+          <div class="card playlist-card" data-title="{{ item.title }}" data-category="books">
+            <img src="{{ item.poster }}" alt="{{ item.title }}" style="width: 100%; aspect-ratio: 2/3; object-fit: cover;">
+            <div class="movie-overlay">
+              <p>{{ item.title }}</p>
+              <button class="remove-btn" onclick="removeFromPlaylist('{{ item.title|escapejs }}', 'books')">Remove</button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if not movies and not anime and not webseries and not games and not books %}
+      <div class="empty-playlist">
+        <p>Your playlist is empty. Start adding items from the recommendations!</p>
+      </div>
+      {% endif %}
+    </div>
+  </main>
+
+  <script>
+    // Get CSRF token from cookie
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    // Remove from playlist functionality
+    function removeFromPlaylist(title, category) {
+      // Properly escape the title for the request
+      const encodedTitle = encodeURIComponent(title);
+      
+      fetch("/remove_from_playlist/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-CSRFToken": csrftoken
+        },
+        body: `title=${encodedTitle}&category=${category}`
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          // Remove the item from the DOM
+          const item = document.querySelector(`[data-title="${title}"][data-category="${category}"]`);
+          if (item) {
+            item.remove();
+            // If this was the last item in its category, remove the category section
+            const categorySection = item.closest('.playlist-section');
+            if (categorySection && !categorySection.querySelector('.playlist-card')) {
+              categorySection.remove();
+            }
+            // If no items left at all, show the empty message
+            if (!document.querySelector('.playlist-card')) {
+              const container = document.querySelector('.playlist-container');
+              container.innerHTML = `
+                <div class="empty-playlist">
+                  <p>Your playlist is empty. Start adding items from the recommendations!</p>
+                </div>
+              `;
+            }
+          } else {
+            location.reload(); // Fallback to page reload if DOM manipulation fails
+          }
+        } else {
+          alert('Failed to remove from playlist. Please try again.');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to remove from playlist. Please try again.');
+      });
+    }
+
+    // Trailer functionality
+    let trailers = {};
+
+    // Load trailers data
+    fetch("/static/trailers.csv")
+      .then(res => res.text())
+      .then(csv => {
+        const lines = csv.split('\n');
+        // Skip the header row
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          const [title, link] = line.split(',');
+          if (title && link && link !== 'Not Found') {
+            trailers[title.trim()] = link.trim();
+          }
+        }
+        console.log('Loaded trailers:', Object.keys(trailers).length);
+      })
+      .catch(error => {
+        console.error('Error loading trailers:', error);
+      });
+
+    function showTrailer(title) {
+      const link = trailers[title];
+      if (!link) {
+        alert('Trailer not available for this title');
+        return;
+      }
+
+      let videoId;
+      if (link.includes('youtube.com/watch?v=')) {
+        videoId = link.split('v=')[1].split('&')[0];
+      } else if (link.includes('youtu.be/')) {
+        videoId = link.split('youtu.be/')[1].split('?')[0];
+      } else if (link.includes('youtube.com/embed/')) {
+        videoId = link.split('embed/')[1].split('?')[0];
+      }
+
+      if (videoId) {
+        // Create modal for trailer
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.8);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 1000;
+        `;
+
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = `
+          width: 80%;
+          max-width: 800px;
+          aspect-ratio: 16/9;
+          border: none;
+          border-radius: 8px;
+        `;
+        iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+        iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+        iframe.allowFullscreen = true;
+
+        modal.appendChild(iframe);
+        document.body.appendChild(modal);
+
+        // Close modal when clicking outside
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) {
+            modal.remove();
+          }
+        });
+      } else {
+        alert('Could not load trailer');
+      }
+    }
+  </script>
+
+  <style>
+    .playlist-container {
+      padding: 20px;
+    }
+
+    .playlist-section {
+      margin-bottom: 40px;
+    }
+
+    .playlist-section h3 {
+      color: white;
+      margin-bottom: 20px;
+      font-size: 1.5em;
+    }
+
+    .playlist-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 30px;
+      justify-content: center;
+    }
+
+    .playlist-card {
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.3s ease;
+      flex: 0 0 300px;
+      cursor: pointer;
+    }
+
+    .playlist-card:hover {
+      transform: scale(1.05);
+    }
+
+    .playlist-card:hover .movie-overlay {
+      transform: translateY(0);
+    }
+
+    .movie-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0,0,0,0.8);
+      padding: 15px;
+      transform: translateY(100%);
+      transition: transform 0.3s ease;
+    }
+
+    .movie-overlay p {
+      margin: 0 0 10px 0;
+      color: white;
+    }
+
+    .trailer-btn, .remove-btn {
+      background: #e50914;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+      margin-right: 10px;
+    }
+
+    .remove-btn {
+      background: #032541;
+    }
+
+    .trailer-btn:hover {
+      background: #f40612;
+    }
+
+    .remove-btn:hover {
+      background: #043b5c;
+    }
+
+    .empty-playlist {
+      text-align: center;
+      color: white;
+      padding: 40px;
+      font-size: 1.2em;
+    }
+  </style>
+</body>
+</html> 

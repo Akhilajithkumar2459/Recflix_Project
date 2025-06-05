@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 - Page Not Found</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="home-bg">
+    <header class="navbar">
+        <div class="logo">RecFlix</div>
+        <nav>
+            <ul>
+                <li class="ll"><a href="/trailer">Trailer</a></li>
+                <li class="ll"><a href="/">Home</a></li>
+                {% if user.is_authenticated %}
+                <li class="dropdown-parent">
+                    <span class="user-label">Hi, {{ user.first_name }}</span>
+                    <div class="dropdown">
+                        <a href="/">Home</a>
+                        <a href="/logout">Logout</a>
+                    </div>
+                </li>
+                {% else %}
+                <li class="ll"><a href="/login">Login</a></li>
+                <li class="ll"><a href="/register">Register</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </header>
+
+    <main class="container">
+        <div class="error-container">
+            <h1>404</h1>
+            <h2>Page Not Found</h2>
+            <p>The page you're looking for doesn't exist or has been moved.</p>
+            <a href="/" class="btn">Go Home</a>
+        </div>
+    </main>
+</body>
+</html> 

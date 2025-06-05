@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Games</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  {% csrf_token %}
+</head>
+<body class="games-bg">
+  <header class="navbar">
+    <div class="logo">RecFlix</div>
+    <nav>
+      <ul>
+        <li class="ll"><a href="/">Home</a></li>
+        <li class="ll"><a href="/movies">Movies</a></li>
+        <li class="ll"><a href="/anime">Anime</a></li>
+        <li class="ll"><a href="/webseries">Web Series</a></li>
+        <li class="ll"><a href="/books">Books</a></li>
+        {% if user.is_authenticated %}
+        <li class="dropdown-parent">
+          <span class="user-label">Hi, {{ user.first_name }}</span>
+          <div class="dropdown">
+            <a href="/history">History</a>
+            <a href="/playlist">Playlist</a>
+            <a href="/logout">Logout</a>
+          </div>
+        </li>
+        {% else %}
+        <li class="ll"><a href="/login">Login</a></li>
+        <li class="ll"><a href="/register">Register</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container">
+    <h2>Game Recommendations</h2>
+
+    <div class="search-bar">
+      <input id="searchInput" type="text" placeholder="Search for a game...">
+      <div id="autocomplete-list" class="autocomplete-items"></div>
+    </div>
+
+    <div class="recommend-grid" id="recommend-grid"></div>
+  </main>
+
+  <script>
+    // Get CSRF token from cookie
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    // Load trailers data
+    let trailers = {};
+    fetch("/static/trailers.csv")
+      .then(res => res.text())
+      .then(csv => {
+        const lines = csv.split('\n');
+        // Skip the header row
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          const [title, link] = line.split(',');
+          if (title && link && link !== 'Not Found') {
+            // Convert title to lowercase and remove special characters
+            const cleanTitle = title.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '');
+            trailers[cleanTitle] = link.trim();
+          }
+        }
+        console.log('Loaded trailers:', Object.keys(trailers).length);
+      })
+      .catch(error => {
+        console.error('Error loading trailers:', error);
+      });
+
+    function watchTrailer(title) {
+      // Clean the title to match the format in trailers.csv
+      const cleanTitle = title.toLowerCase().replace(/[^a-z0-9\s]/g, '');
+      console.log('Looking for trailer:', cleanTitle);
+      console.log('Available trailers:', Object.keys(trailers));
+      
+      // First try exact match
+      let link = trailers[cleanTitle];
+      
+      // If no exact match, try partial match
+      if (!link) {
+        const possibleMatch = Object.keys(trailers).find(key => {
+          const titleWords = cleanTitle.split(' ');
+          const keyWords = key.split(' ');
+          // Check if most words match
+          const matchingWords = titleWords.filter(word => keyWords.includes(word));
+          return matchingWords.length >= Math.min(titleWords.length, keyWords.length) * 0.7; // 70% match threshold
+        });
+        
+        if (possibleMatch) {
+          console.log('Found partial match:', possibleMatch);
+          link = trailers[possibleMatch];
+        }
+      }
+      
+      if (!link) {
+        console.log('No trailer found for:', cleanTitle);
+        alert('Trailer not available for this title');
+        return;
+      }
+
+      const videoId = extractVideoId(link);
+      if (videoId) {
+        showTrailerModal(videoId);
+      } else {
+        console.log('Could not extract video ID from:', link);
+        alert('Could not load trailer');
+      }
+    }
+
+    function extractVideoId(link) {
+      if (!link) return null;
+      
+      let videoId = null;
+      if (link.includes('youtube.com/watch?v=')) {
+        videoId = link.split('v=')[1].split('&')[0];
+      } else if (link.includes('youtu.be/')) {
+        videoId = link.split('youtu.be/')[1].split('?')[0];
+      } else if (link.includes('youtube.com/embed/')) {
+        videoId = link.split('embed/')[1].split('?')[0];
+      }
+      
+      console.log('Extracted video ID:', videoId, 'from link:', link);
+      return videoId;
+    }
+
+    function showTrailerModal(videoId) {
+      const modal = document.createElement('div');
+      modal.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      `;
+
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = `
+        width: 80%;
+        max-width: 800px;
+        aspect-ratio: 16/9;
+        border: none;
+        border-radius: 8px;
+      `;
+      iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+      iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+      iframe.allowFullscreen = true;
+
+      modal.appendChild(iframe);
+      document.body.appendChild(modal);
+
+      // Close modal when clicking outside
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          modal.remove();
+        }
+      });
+    }
+
+    function getRecommendations(title) {
+      fetch("/recommend/games/", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-CSRFToken": csrftoken
+        },
+        body: "name=" + encodeURIComponent(title)
+      })
+      .then(res => res.json())
+      .then(data => {
+        const container = document.querySelector("#recommend-grid");
+        container.innerHTML = "";
+
+        // Display selected item
+        const clickedPoster = data.selected ? data.selected.poster : '/static/posters/default.jpg';
+        container.innerHTML += `
+          <div class="selected-content" style="display: flex; gap: 30px; margin-bottom: 30px; height: 300px; min-height: 300px; max-height: 300px;">
+            <div class="card selected-movie" style="flex: 0 0 200px; position: relative; overflow: hidden; height: 100%;">
+              <img src="${clickedPoster}" alt="${title}" style="width: 100%; height: 100%; object-fit: cover;">
+              <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.8); padding: 15px;">
+                <p style="margin: 0; color: white;"><strong>${title}</strong></p>
+                <button class="trailer-btn" onclick="watchTrailer('${title.replace(/'/g, "\\'")}')" style="margin-top: 10px;">Watch Trailer</button>
+                <button class="playlist-btn" onclick="addToPlaylist('${title.replace(/'/g, "\\'")}', 'games')" style="margin-top: 10px; margin-left: 10px; background: #032541;">Add to Playlist</button>
+              </div>
+            </div>
+            <div class="info-box" style="flex: 1; padding: 20px; background: rgba(255, 255, 255, 0.1); border-radius: 8px; color: white; font-size: 0.9em; height: 100%; display: flex; flex-direction: column; overflow: hidden;">
+              <div class="info-header" style="flex: 0 0 auto;">
+                ${data.selected.rating ? `
+                  <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                    <div style="background: #032541; padding: 8px; border-radius: 50%; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; margin-right: 12px;">
+                      <span style="font-weight: bold;">${parseFloat(data.selected.rating).toFixed(1)}</span>
+                    </div>
+                    <span>Rating</span>
+                  </div>
+                ` : ''}
+                ${data.selected.year ? `<p style="margin-bottom: 8px;"><strong>Release Year:</strong> ${data.selected.year}</p>` : ''}
+                ${data.selected.genre ? `<p style="margin-bottom: 8px;"><strong>Genres:</strong> ${data.selected.genre}</p>` : ''}
+              </div>
+              ${data.selected.description ? `
+                <div class="info-overview" style="margin-top: 12px; flex: 1; overflow-y: auto; padding-right: 10px;">
+                  <h4 style="margin-bottom: 8px; font-size: 1.1em;">Overview</h4>
+                  <p style="line-height: 1.5; font-size: 0.95em;">${data.selected.description}</p>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+
+        // Display recommendations
+        const recommendationsContainer = document.createElement('div');
+        recommendationsContainer.className = 'recommendations-container';
+        recommendationsContainer.innerHTML = `
+          <h3 style="width: 100%; text-align: center;">Recommended for you:</h3>
+          <div class="recommendations-grid" style="display: flex; flex-wrap: wrap; gap: 30px; justify-content: center; padding: 20px 0;"></div>
+        `;
+        container.appendChild(recommendationsContainer);
+
+        const recommendationsGrid = recommendationsContainer.querySelector('.recommendations-grid');
+        data.recommendations.forEach(item => {
+          const card = document.createElement("div");
+          card.className = "card recommendation-card";
+          card.onclick = () => getRecommendations(item.title);
+          card.innerHTML = `
+            <div style="width: 100%; height: 280px; overflow: hidden;">
+              <img src="${item.poster}" alt="${item.title}" style="width: 100%; height: 100%; object-fit: cover;">
+            </div>
+            <p style="margin: 10px 0; text-align: center; color: white; font-size: 0.9em; padding: 0 5px;">${item.title}</p>
+          `;
+          recommendationsGrid.appendChild(card);
+        });
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to get recommendations. Please try again.');
+      });
+    }
+
+    function getMetacriticColor(score) {
+      if (score >= 75) return '#66cc33'; // Green
+      if (score >= 50) return '#ffcc33'; // Yellow
+      return '#ff0000'; // Red
+    }
+
+    function setupSearchAutocomplete() {
+      fetch("/titles/games/")
+        .then(res => res.json())
+        .then(titles => {
+          const input = document.getElementById("searchInput");
+          const list = document.getElementById("autocomplete-list");
+
+          input.addEventListener("input", function () {
+            list.innerHTML = "";
+            const val = this.value.toLowerCase();
+            if (!val) return false;
+
+            titles.filter(t => t.toLowerCase().startsWith(val)).slice(0, 10).forEach(title => {
+              const item = document.createElement("div");
+              item.innerHTML = title;
+              item.onclick = function () {
+                input.value = title;
+                list.innerHTML = "";
+                getRecommendations(title);
+              };
+              list.appendChild(item);
+            });
+          });
+
+          document.addEventListener("click", function (e) {
+            if (e.target !== input) list.innerHTML = "";
+          });
+        });
+    }
+
+    window.onload = function() {
+      setupSearchAutocomplete();
+      fetch("/random/games/")
+        .then(res => res.json())
+        .then(data => {
+          const container = document.querySelector("#recommend-grid");
+          container.innerHTML = "";
+          data.forEach(item => {
+            const card = document.createElement("div");
+            card.className = "card recommendation-card";
+            card.onclick = () => getRecommendations(item.title);
+            card.innerHTML = `
+              <div style="width: 100%; height: 280px; overflow: hidden;">
+                <img src="${item.poster}" alt="${item.title}" style="width: 100%; height: 100%; object-fit: cover;">
+              </div>
+              <p style="margin: 10px 0; text-align: center; color: white; font-size: 0.9em; padding: 0 5px;">${item.title}</p>
+            `;
+            container.appendChild(card);
+          });
+        });
+    }
+
+    // Add to playlist functionality
+    function addToPlaylist(title, category) {
+      // Clean the title before sending to server
+      const cleanTitle = title.toLowerCase().replace(/[^a-z0-9\s]/g, '');
+      fetch("/add_to_playlist/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-CSRFToken": csrftoken
+        },
+        body: `title=${encodeURIComponent(cleanTitle)}&category=${category}`
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          alert('Added to playlist successfully!');
+        } else {
+          alert('Failed to add to playlist. Please try again.');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to add to playlist. Please try again.');
+      });
+    }
+  </script>
+
+  <style>
+    .recommendation-card {
+      width: calc(20vw - 20px);
+      min-width: 150px;
+      max-width: 200px;
+      height: calc(30vw - 20px);
+      min-height: 225px;
+      max-height: 300px;
+      margin: 10px;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      transition: transform 0.3s ease;
+      background: #1a1a1a;
+      position: relative;
+    }
+
+    .recommendation-card:hover {
+      transform: scale(1.05);
+    }
+
+    .recommendation-card img {
+      width: 100%;
+      height: 85%;
+      object-fit: cover;
+    }
+
+    .recommendation-card p {
+      margin: 0;
+      padding: 8px;
+      font-size: 14px;
+      color: #fff;
+      text-align: center;
+      background: transparent;
+      height: 15%;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      word-wrap: break-word;
+      line-height: 1.2;
+    }
+
+    .movie-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0,0,0,0.8);
+      padding: 15px;
+      transform: translateY(100%);
+      transition: transform 0.3s ease;
+      max-height: 100%;
+      overflow-y: auto;
+    }
+
+    .movie-overlay p {
+      margin: 0 0 10px 0;
+      color: white;
+      font-size: 1.1em;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      word-wrap: break-word;
+      line-height: 1.2;
+      background: transparent;
+    }
+
+    .selected-content {
+      display: flex;
+      gap: 30px;
+      margin-bottom: 30px;
+      height: calc(30vw - 20px);
+      min-height: 225px;
+      max-height: 300px;
+    }
+
+    .selected-movie {
+      flex: 0 0 calc(20vw - 20px);
+      min-width: 150px;
+      max-width: 200px;
+      position: relative;
+      overflow: hidden;
+      height: 100%;
+    }
+
+    .selected-movie p {
+      margin: 0;
+      color: white;
+      font-size: 1.1em;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      word-wrap: break-word;
+      line-height: 1.2;
+      background: transparent;
+    }
+
+    .recommendations-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .info-box {
+      flex: 1;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      color: white;
+      font-size: 0.9em;
+      height: 450px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .info-header {
+      flex: 0 0 auto;
+    }
+
+    .info-overview {
+      margin-top: 12px;
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 10px;
+    }
+
+    .info-overview::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .info-overview::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+
+    .info-overview::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 4px;
+    }
+
+    .info-overview::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.4);
+    }
+
+    .trailer-btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
+      transition: background-color 0.3s ease;
+    }
+
+    .trailer-btn:hover {
+      background: #ff0f1f !important;
+    }
+
+    .recommendations-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 30px;
+      justify-content: center;
+      padding: 20px 0;
+    }
+
+    @media (max-width: 768px) {
+      .selected-content {
+        flex-direction: column;
+        align-items: center;
+        height: auto;
+      }
+
+      .selected-movie {
+        width: 200px;
+        height: 300px;
+      }
+
+      .info-box {
+        width: 100%;
+        max-width: 600px;
+      }
+    }
+  </style>
+</body>
+</html>

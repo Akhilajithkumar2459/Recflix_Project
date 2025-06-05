@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Home - RecFlix</title>
+  <link rel="stylesheet" href="/static/style.css"/>
+  <style>
+    .categories {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 20px;
+      margin: 40px 0;
+    }
+
+    .category-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .category-title {
+      font-size: 1.8em;
+      color: white;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+      margin: 0;
+    }
+
+    .category-card {
+      position: relative;
+      width: 100%;
+      height: 25vh;
+      min-height: 200px;
+      max-height: 250px;
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.3s ease;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+
+    .category-card:hover {
+      transform: scale(1.05);
+    }
+
+    .category-card img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: opacity 0.5s ease;
+    }
+
+    .category-card .overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(transparent, rgba(0,0,0,0.7));
+      padding: 15px;
+      color: white;
+      text-align: center;
+      z-index: 2;
+    }
+
+    .category-card .overlay p {
+      margin: 0;
+      font-size: 1.1em;
+      opacity: 0.9;
+    }
+
+    .recent-section {
+      margin-bottom: 40px;
+    }
+
+    .recent-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 30px;
+      justify-content: center;
+      padding: 20px 0;
+      transition: opacity 0.5s ease;
+    }
+
+    .recent-card {
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.3s ease;
+      width: 200px;
+      height: 280px;
+      cursor: pointer;
+      border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+
+    .recent-card:hover {
+      transform: scale(1.05);
+    }
+
+    .recent-card:hover .movie-overlay {
+      transform: translateY(0);
+    }
+
+    .movie-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0,0,0,0.8);
+      padding: 15px;
+      transform: translateY(0);
+      transition: transform 0.3s ease;
+      max-height: 100%;
+      overflow-y: auto;
+    }
+
+    .movie-overlay p {
+      margin: 0 0 10px 0;
+      color: white;
+      font-size: 1.1em;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      word-wrap: break-word;
+      line-height: 1.2;
+    }
+
+    .category-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      background: #032541;
+      color: white;
+      border-radius: 4px;
+      font-size: 0.8em;
+      margin-bottom: 10px;
+    }
+
+    .trailer-btn, .playlist-btn {
+      background: #e50914;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+      margin-right: 10px;
+      font-weight: bold;
+    }
+
+    .playlist-btn {
+      background: #032541;
+    }
+
+    .trailer-btn:hover {
+      background: #f40612;
+    }
+
+    .playlist-btn:hover {
+      background: #043b5c;
+    }
+
+    .poster-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .poster-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: opacity 0.5s ease-in-out;
+    }
+
+    .popular-count {
+      font-size: 0.8em;
+      color: #aaa;
+      margin-top: 5px;
+    }
+
+    .error-message {
+      color: #e50914;
+      text-align: center;
+      padding: 20px;
+      width: 100%;
+    }
+
+    .error-details {
+      font-size: 0.8em;
+      color: #666;
+    }
+
+    .no-items {
+      color: #666;
+      text-align: center;
+      padding: 20px;
+      width: 100%;
+    }
+
+    .category-section {
+      margin: 40px 0;
+    }
+
+    .category-section h2 {
+      color: white;
+      margin-bottom: 20px;
+      font-size: 1.8em;
+    }
+
+    #popular-movies, #popular-anime, #popular-webseries, #popular-books, #popular-games {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      padding: 10px 0;
+    }
+
+    @media (max-width: 1200px) {
+      .categories {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    @media (max-width: 900px) {
+      .categories {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 600px) {
+      .categories {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .category-card {
+      position: relative;
+      width: 100%;
+      height: 280px;
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.3s ease;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+
+    .category-card:hover {
+      transform: scale(1.05);
+    }
+
+    .category-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .movie-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0,0,0,0.8);
+      padding: 15px;
+      transform: translateY(0);
+      transition: transform 0.3s ease;
+    }
+
+    .movie-overlay p {
+      margin: 0 0 10px 0;
+      color: white;
+      font-size: 1.1em;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      word-wrap: break-word;
+      line-height: 1.2;
+    }
+
+    .popular-count {
+      font-size: 0.8em;
+      color: #aaa;
+      margin-top: 5px;
+    }
+
+    .no-items {
+      color: #666;
+      text-align: center;
+      padding: 20px;
+      grid-column: 1 / -1;
+    }
+
+    .error-message {
+      color: #e50914;
+      text-align: center;
+      padding: 20px;
+      grid-column: 1 / -1;
+    }
+  </style>
+</head>
+<body class="home-bg">
+  <header class="navbar">
+    <div class="logo">RecFlix</div>
+    <nav>
+      <ul>
+        {% if user.is_authenticated %}
+        <li class="dropdown-parent">
+          <span class="user-label">Hi, {{ user.first_name }}</span>
+          <div class="dropdown">
+            <a href="/history">History</a>
+            <a href="/playlist">Playlist</a>
+            <a href="/logout">Logout</a>
+          </div>
+        </li>
+        {% else %}
+        <li class="ll"><a href="/login">Login</a></li>
+        <li class="ll"><a href="/register">Register</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container">
+    <h1>Welcome to RecFlix</h1>
+    <p>Your personalized entertainment recommendation system.</p>
+
+    <div class="categories">
+      <div class="category-container">
+        <h2 class="category-title">🎬 Movies</h2>
+        <a href="/movies" class="category-card" data-category="movies">
+          {% if user.is_authenticated %}
+          <div class="poster-container movies-poster"></div>
+          {% else %}
+          <div class="poster-container">
+            {% if directory_posters.movies %}
+            <img src="{{ directory_posters.movies.0.poster }}" alt="Movies">
+            {% endif %}
+          </div>
+          {% endif %}
+          <div class="overlay">
+            <p>Discover your next favorite film</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="category-container">
+        <h2 class="category-title">🧝‍♂️ Anime</h2>
+        <a href="/anime" class="category-card" data-category="anime">
+          {% if user.is_authenticated %}
+          <div class="poster-container anime-poster"></div>
+          {% else %}
+          <div class="poster-container">
+            {% if directory_posters.anime %}
+            <img src="{{ directory_posters.anime.0.poster }}" alt="Anime">
+            {% endif %}
+          </div>
+          {% endif %}
+          <div class="overlay">
+            <p>Explore amazing anime series</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="category-container">
+        <h2 class="category-title">📚 Books</h2>
+        <a href="/books" class="category-card" data-category="books">
+          {% if user.is_authenticated %}
+          <div class="poster-container books-poster"></div>
+          {% else %}
+          <div class="poster-container">
+            {% if directory_posters.books %}
+            <img src="{{ directory_posters.books.0.poster }}" alt="Books">
+            {% endif %}
+          </div>
+          {% endif %}
+          <div class="overlay">
+            <p>Find your next great read</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="category-container">
+        <h2 class="category-title">📺 Web Series</h2>
+        <a href="/webseries" class="category-card" data-category="webseries">
+          {% if user.is_authenticated %}
+          <div class="poster-container webseries-poster"></div>
+          {% else %}
+          <div class="poster-container">
+            {% if directory_posters.webseries %}
+            <img src="{{ directory_posters.webseries.0.poster }}" alt="Web Series">
+            {% endif %}
+          </div>
+          {% endif %}
+          <div class="overlay">
+            <p>Binge-worthy series await</p>
+          </div>
+        </a>
+      </div>
+
+      <div class="category-container">
+        <h2 class="category-title">🎮 Games</h2>
+        <a href="/games" class="category-card" data-category="games">
+          {% if user.is_authenticated %}
+          <div class="poster-container games-poster"></div>
+          {% else %}
+          <div class="poster-container">
+            {% if directory_posters.games %}
+            <img src="{{ directory_posters.games.0.poster }}" alt="Games">
+            {% endif %}
+          </div>
+          {% endif %}
+          <div class="overlay">
+            <p>Level up your gaming experience</p>
+          </div>
+        </a>
+      </div>
+    </div>
+
+    {% if user.is_authenticated and recent_items %}
+    <div class="recent-section">
+      <h2>Recent Recommendations</h2>
+      <div class="recent-grid" id="recent-recommendations">
+        {% for item in recent_items %}
+        <div class="card recent-card">
+          <img src="{{ item.poster }}" alt="{{ item.title }}" style="width: 100%; aspect-ratio: 2/3; object-fit: cover;">
+          <div class="movie-overlay">
+            <p>{{ item.title }}</p>
+            <span class="category-badge">{{ item.category|title }}</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="category-section">
+        <h2>Most Popular Movies</h2>
+        <div class="category-container" id="popular-movies">
+            <!-- Popular movies will be loaded here -->
+        </div>
+    </div>
+
+    <div class="category-section">
+        <h2>Most Popular Anime</h2>
+        <div class="category-container" id="popular-anime">
+            <!-- Popular anime will be loaded here -->
+        </div>
+    </div>
+
+    <div class="category-section">
+        <h2>Most Popular Web Series</h2>
+        <div class="category-container" id="popular-webseries">
+            <!-- Popular webseries will be loaded here -->
+        </div>
+    </div>
+
+    <div class="category-section">
+        <h2>Most Popular Books</h2>
+        <div class="category-container" id="popular-books">
+            <!-- Popular books will be loaded here -->
+        </div>
+    </div>
+
+    <div class="category-section">
+        <h2>Most Popular Games</h2>
+        <div class="category-container" id="popular-games">
+            <!-- Popular games will be loaded here -->
+        </div>
+    </div>
+  </main>
+
+  <script>
+    // Get CSRF token from cookie
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    // Function to update recent recommendations
+    async function updateRecentRecommendations() {
+      try {
+        const offset = parseInt(document.getElementById('recent-recommendations').dataset.offset || '0');
+        const response = await fetch(`/random/recommendations/?offset=${offset}`);
+        const data = await response.json();
+        const container = document.getElementById('recent-recommendations');
+        
+        if (!data.recommendations || data.recommendations.length === 0) {
+          // If no more recommendations, start over from the beginning
+          container.dataset.offset = '0';
+          return updateRecentRecommendations();
+        }
+        
+        // Update the offset for next time
+        container.dataset.offset = offset + 5;
+        
+        // Fade out current recommendations
+        container.style.opacity = '0';
+        
+        setTimeout(() => {
+          // Update the content
+          container.innerHTML = data.recommendations.map(item => `
+            <div class="card recent-card">
+              <img src="${item.poster}" alt="${item.title}" style="width: 100%; aspect-ratio: 2/3; object-fit: cover;">
+              <div class="movie-overlay">
+                <p>${item.title}</p>
+                <span class="category-badge">${item.category}</span>
+              </div>
+            </div>
+          `).join('');
+          
+          // Fade in new recommendations
+          container.style.opacity = '1';
+        }, 500);
+      } catch (error) {
+        console.error('Error updating recommendations:', error);
+      }
+    }
+
+    // Function to get random items for each category
+    async function getRandomItems(category) {
+      try {
+        const response = await fetch(`/random/${category}/`);
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        console.error(`Error fetching ${category} items:`, error);
+        return [];
+      }
+    }
+
+    // Function to get a random item that hasn't been shown recently
+    function getNextRandomItem(items, recentItems) {
+      const availableItems = items.filter(item => !recentItems.includes(item.title));
+      if (availableItems.length === 0) {
+        recentItems.length = 0;
+        return items[Math.floor(Math.random() * items.length)];
+      }
+      const randomItem = availableItems[Math.floor(Math.random() * availableItems.length)];
+      recentItems.push(randomItem.title);
+      if (recentItems.length > 10) {
+        recentItems.shift();
+      }
+      return randomItem;
+    }
+
+    // Function to cycle through posters
+    async function setupPosterCycling() {
+      const cards = document.querySelectorAll('.category-card');
+      
+      for (const card of cards) {
+        const category = card.dataset.category;
+        const posterContainer = card.querySelector('.poster-container');
+        
+        {% if user.is_authenticated %}
+        const items = await getRandomItems(category);
+        const recentItems = [];
+        
+        if (items.length > 0) {
+          const img = document.createElement('img');
+          img.src = getNextRandomItem(items, recentItems).poster;
+          img.alt = 'Random poster';
+          posterContainer.appendChild(img);
+
+          setInterval(() => {
+            const currentImg = card.querySelector('img');
+            const nextItem = getNextRandomItem(items, recentItems);
+            
+            const newImg = document.createElement('img');
+            newImg.src = nextItem.poster;
+            newImg.alt = nextItem.title;
+            newImg.style.opacity = '0';
+            
+            posterContainer.appendChild(newImg);
+            
+            currentImg.style.opacity = '0';
+            
+            setTimeout(() => {
+              newImg.style.opacity = '1';
+              setTimeout(() => {
+                currentImg.remove();
+              }, 500);
+            }, 50);
+          }, 3000);
+        }
+        {% else %}
+        // For non-authenticated users, cycle through directory posters
+        const posters = {{ directory_posters|safe }};
+        if (posters && posters[category] && posters[category].length > 0) {
+          let currentIndex = 0;
+          const img = document.createElement('img');
+          img.src = posters[category][currentIndex].poster;
+          img.alt = 'Poster';
+          posterContainer.appendChild(img);
+
+          setInterval(() => {
+            const currentImg = card.querySelector('img');
+            currentIndex = (currentIndex + 1) % posters[category].length;
+            
+            const newImg = document.createElement('img');
+            newImg.src = posters[category][currentIndex].poster;
+            newImg.alt = 'Poster';
+            newImg.style.opacity = '0';
+            
+            posterContainer.appendChild(newImg);
+            
+            currentImg.style.opacity = '0';
+            
+            setTimeout(() => {
+              newImg.style.opacity = '1';
+              setTimeout(() => {
+                currentImg.remove();
+              }, 500);
+            }, 50);
+          }, 3000);
+        }
+        {% endif %}
+      }
+    }
+
+    // Initialize everything when page loads
+    window.addEventListener('load', function() {
+      setupPosterCycling();
+      
+      // If user is authenticated, start cycling recent recommendations
+      {% if user.is_authenticated %}
+      updateRecentRecommendations(); // Initial load
+      setInterval(updateRecentRecommendations, 5000); // Update every 5 seconds
+      {% endif %}
+    });
+
+    // Function to load popular items
+    function loadPopularItems(category) {
+      console.log(`Loading popular items for category: ${category}`);
+      const container = document.getElementById(`popular-${category}`);
+      if (!container) {
+        console.error(`Container not found for category: ${category}`);
+        return;
+      }
+
+      // Show loading state
+      container.innerHTML = '<p>Loading popular items...</p>';
+
+      fetch(`/api/popular/${category}/`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          console.log(`Received data for ${category}:`, data);
+          
+          if (data.error) {
+            throw new Error(data.error);
+          }
+
+          container.innerHTML = '';
+          if (data.items && data.items.length > 0) {
+            data.items.forEach(item => {
+              const card = document.createElement('div');
+              card.className = 'category-card';
+              card.innerHTML = `
+                <img src="${item.poster}" alt="${item.title}">
+                <div class="movie-overlay">
+                  <p>${item.title}</p>
+                  <p class="popular-count">Added by ${item.count} users</p>
+                </div>
+              `;
+              card.onclick = () => showMovieDetails(item.title, category);
+              container.appendChild(card);
+            });
+          } else {
+            container.innerHTML = '<p class="no-items">No popular items yet. Add items to your playlist to see them here!</p>';
+          }
+        })
+        .catch(error => {
+          console.error(`Error loading popular items for ${category}:`, error);
+          container.innerHTML = `
+            <div class="error-message">
+              <p>Error loading popular items</p>
+              <p class="error-details">${error.message}</p>
+            </div>
+          `;
+        });
+    }
+
+    // Add some styles for error and loading states
+    const style = document.createElement('style');
+    style.textContent = `
+      .error-message {
+        color: #e50914;
+        text-align: center;
+        padding: 20px;
+      }
+      .error-details {
+        font-size: 0.8em;
+        color: #666;
+      }
+      .no-items {
+        color: #666;
+        text-align: center;
+        padding: 20px;
+      }
+    `;
+    document.head.appendChild(style);
+
+    // Load popular items for each category
+    document.addEventListener('DOMContentLoaded', () => {
+      loadPopularItems('movies');
+      loadPopularItems('anime');
+      loadPopularItems('webseries');
+      loadPopularItems('books');
+      loadPopularItems('games');
+    });
+  </script>
+</body>
+</html>

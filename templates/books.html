@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Books</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  {% csrf_token %}
+  <style>
+    .recommendation-card {
+      width: calc(20vw - 20px);
+      min-width: 150px;
+      max-width: 200px;
+      height: calc(30vw - 20px);
+      min-height: 225px;
+      max-height: 300px;
+      margin: 10px;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      transition: transform 0.3s ease;
+      background: #1a1a1a;
+      position: relative;
+    }
+
+    .recommendation-card:hover {
+      transform: scale(1.05);
+    }
+
+    .recommendation-card img {
+      width: 100%;
+      height: 85%;
+      object-fit: cover;
+    }
+
+    .recommendation-card p {
+      margin: 0;
+      padding: 8px;
+      font-size: 14px;
+      color: #fff;
+      text-align: center;
+      background: #1a1a1a;
+      height: 15%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .book-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0,0,0,0.8);
+      padding: 10px;
+      transform: translateY(100%);
+      transition: transform 0.3s ease;
+    }
+
+    .recommendation-card:hover .book-overlay {
+      transform: translateY(0);
+    }
+
+    .selected-content {
+      display: flex;
+      gap: 30px;
+      margin-bottom: 30px;
+      height: calc(30vw - 20px);
+      min-height: 225px;
+      max-height: 300px;
+    }
+
+    .selected-movie {
+      flex: 0 0 calc(20vw - 20px);
+      min-width: 150px;
+      max-width: 200px;
+      position: relative;
+      overflow: hidden;
+      height: 100%;
+    }
+
+    .info-box {
+      flex: 1;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      color: white;
+      font-size: 0.9em;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .info-header {
+      flex: 0 0 auto;
+    }
+
+    .info-overview {
+      margin-top: 12px;
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 10px;
+    }
+
+    .info-overview::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .info-overview::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+
+    .info-overview::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 4px;
+    }
+
+    .info-overview::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.4);
+    }
+
+    .recommendations-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .recommendations-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 30px;
+      justify-content: center;
+      padding: 20px 0;
+    }
+
+    @media (max-width: 768px) {
+      .selected-content {
+        flex-direction: column;
+        align-items: center;
+        height: auto;
+      }
+
+      .selected-movie {
+        width: 200px;
+        height: 300px;
+      }
+
+      .info-box {
+        width: 100%;
+        max-width: 600px;
+      }
+    }
+  </style>
+</head>
+<body class="books-bg">
+  <header class="navbar">
+    <div class="logo">RecFlix</div>
+    <nav>
+      <ul>
+        <li class="ll"><a href="/">Home</a></li>
+        <li class="ll"><a href="/movies">Movies</a></li>
+        <li class="ll"><a href="/anime">Anime</a></li>
+        <li class="ll"><a href="/webseries">Web Series</a></li>
+        <li class="ll"><a href="/games">Games</a></li>
+        {% if user.is_authenticated %}
+        <li class="dropdown-parent">
+          <span class="user-label">Hi, {{ user.first_name }}</span>
+          <div class="dropdown">
+            <a href="/history">History</a>
+            <a href="/playlist">Playlist</a>
+            <a href="/logout">Logout</a>
+          </div>
+        </li>
+        {% else %}
+        <li class="ll"><a href="/login">Login</a></li>
+        <li class="ll"><a href="/register">Register</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container">
+    <h2>Book Recommendations</h2>
+
+    <div class="search-bar">
+      <input id="searchInput" type="text" placeholder="Search for a book...">
+      <div id="autocomplete-list" class="autocomplete-items"></div>
+    </div>
+
+    <div class="recommend-grid" id="recommend-grid"></div>
+  </main>
+
+  <script>
+    // Get CSRF token from cookie
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    function addToPlaylist(title, category) {
+      fetch("/add_to_playlist/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-CSRFToken": csrftoken
+        },
+        body: `title=${encodeURIComponent(title)}&category=${category}`
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          alert('Added to playlist successfully!');
+        } else {
+          alert('Failed to add to playlist. Please try again.');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to add to playlist. Please try again.');
+      });
+    }
+
+    function getRecommendations(title) {
+      fetch("/recommend/books/", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-CSRFToken": csrftoken
+        },
+        body: "name=" + encodeURIComponent(title)
+      })
+      .then(res => res.json())
+      .then(data => {
+        const container = document.querySelector("#recommend-grid");
+        container.innerHTML = "";
+
+        // Display selected item
+        const clickedPoster = data.selected ? data.selected.poster : '/static/posters/default.jpg';
+        container.innerHTML += `
+          <div class="selected-content">
+            <div class="card selected-movie">
+              <img src="${clickedPoster}" alt="${title}" style="width: 100%; height: 100%; object-fit: cover;">
+              <div style="position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.8); padding: 15px;">
+                <p style="margin: 0; color: white;"><strong>${title}</strong></p>
+                <button class="playlist-btn" onclick="addToPlaylist('${title.replace(/'/g, "\\'")}', 'books')" style="margin-top: 10px; background: #032541;">Add to Playlist</button>
+              </div>
+            </div>
+            <div class="info-box">
+              <div class="info-header">
+                ${data.selected && data.selected.rating ? `
+                  <div style="display: flex; align-items: center; margin-bottom: 12px;">
+                    <div style="background: #032541; padding: 8px; border-radius: 50%; width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; margin-right: 12px;">
+                      <span style="font-weight: bold;">${parseFloat(data.selected.rating).toFixed(1)}</span>
+                    </div>
+                    <span>Rating</span>
+                  </div>
+                ` : ''}
+                ${data.selected && data.selected.year ? `<p style="margin-bottom: 8px;"><strong>Release Year:</strong> ${data.selected.year}</p>` : ''}
+                ${data.selected && data.selected.genre ? `<p style="margin-bottom: 8px;"><strong>Genres:</strong> ${data.selected.genre}</p>` : ''}
+              </div>
+              ${data.selected && data.selected.description ? `
+                <div class="info-overview">
+                  <h4 style="margin-bottom: 8px; font-size: 1.1em;">Overview</h4>
+                  <p style="line-height: 1.5; font-size: 0.95em;">${data.selected.description}</p>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        `;
+
+        // Display recommendations
+        const recommendationsContainer = document.createElement('div');
+        recommendationsContainer.className = 'recommendations-container';
+        recommendationsContainer.innerHTML = `
+          <h3 style="width: 100%; text-align: center; margin-top: 30px;">Recommended for you:</h3>
+          <div class="recommendations-grid"></div>
+        `;
+        container.appendChild(recommendationsContainer);
+
+        const recommendationsGrid = recommendationsContainer.querySelector('.recommendations-grid');
+        data.recommendations.forEach(item => {
+          const card = document.createElement("div");
+          card.className = "card recommendation-card";
+          card.onclick = () => getRecommendations(item.title);
+          card.innerHTML = `
+            <img src="${item.poster}" alt="${item.title}" style="width: 100%; height: 85%; object-fit: cover;">
+            <div class="book-overlay">
+              <p style="margin: 0; color: white;">${item.title}</p>
+            </div>
+            <p style="margin: 0; padding: 8px; font-size: 14px; color: white; text-align: center; background: #1a1a1a; height: 15%; display: flex; align-items: center; justify-content: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.title}</p>
+          `;
+          recommendationsGrid.appendChild(card);
+        });
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to get recommendations. Please try again.');
+      });
+    }
+
+    function setupSearchAutocomplete() {
+      fetch("/titles/books/")
+        .then(res => res.json())
+        .then(titles => {
+          const input = document.getElementById("searchInput");
+          const list = document.getElementById("autocomplete-list");
+
+          input.addEventListener("input", function () {
+            list.innerHTML = "";
+            const val = this.value.toLowerCase();
+            if (!val) return false;
+
+            titles.filter(t => t.toLowerCase().startsWith(val)).slice(0, 10).forEach(title => {
+              const item = document.createElement("div");
+              item.innerHTML = title;
+              item.onclick = function () {
+                input.value = title;
+                list.innerHTML = "";
+                getRecommendations(title);
+              };
+              list.appendChild(item);
+            });
+          });
+
+          document.addEventListener("click", function (e) {
+            if (e.target !== input) list.innerHTML = "";
+          });
+        });
+    }
+
+    window.onload = function() {
+      setupSearchAutocomplete();
+      fetch("/random/books/")
+        .then(res => res.json())
+        .then(data => {
+          const container = document.querySelector("#recommend-grid");
+          container.innerHTML = "";
+          data.forEach(item => {
+            const card = document.createElement("div");
+            card.className = "card recommendation-card";
+            card.onclick = () => getRecommendations(item.title);
+            card.innerHTML = `
+              <img src="${item.poster}" alt="${item.title}" style="width: 100%; height: 85%; object-fit: cover;">
+              <div class="book-overlay">
+                <p style="margin: 0; color: white;">${item.title}</p>
+              </div>
+              <p style="margin: 0; padding: 8px; font-size: 14px; color: white; text-align: center; background: #1a1a1a; height: 15%; display: flex; align-items: center; justify-content: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${item.title}</p>
+            `;
+            container.appendChild(card);
+          });
+        });
+    }
+  </script>
+</body>
+</html>

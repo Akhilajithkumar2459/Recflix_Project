@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Trailers</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    .search-container {
+      width: 100%;
+      max-width: 600px;
+      margin: 2rem auto;
+      position: relative;
+    }
+    
+    #player {
+      width: 100%;
+      max-width: 800px;
+      margin: 2rem auto;
+      display: none;
+    }
+    
+    #trailerPlayer {
+      width: 100%;
+      aspect-ratio: 16/9;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+<body class="home-bg">
+  <header class="navbar">
+    <div class="logo">RecFlix</div>
+    <nav>
+      <ul>
+        {% if user.is_authenticated %}
+        <li class="dropdown-parent">
+          <span class="user-label">Hi, {{ user.first_name }}</span>
+          <div class="dropdown">
+            <a href="/">Home</a>
+            <a href="/logout">Logout</a>
+          </div>
+        </li>
+        {% else %}
+        <li class="ll"><a href="/login">Login</a></li>
+        <li class="ll"><a href="/register">Register</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container">
+    <h2>Watch Trailers</h2>
+
+    <div class="search-container">
+      <input type="text" id="searchInput" placeholder="Search for a title..." />
+      <div id="autocomplete-list" class="autocomplete-items"></div>
+    </div>
+
+    <div id="player">
+      <iframe id="trailerPlayer" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+    </div>
+  </main>
+
+  <script>
+    let trailers = {};
+
+    // Load trailers data
+    fetch("/static/trailers.csv")
+      .then(res => res.text())
+      .then(csv => {
+        const lines = csv.split('\n');
+        lines.forEach(line => {
+          const [title, link] = line.split(',');
+          if (title && link) {
+            trailers[title.trim()] = link.trim();
+          }
+        });
+        console.log('Loaded trailers:', Object.keys(trailers).length);
+      })
+      .catch(error => {
+        console.error('Error loading trailers:', error);
+      });
+
+    const input = document.getElementById("searchInput");
+    const list = document.getElementById("autocomplete-list");
+    const player = document.getElementById("player");
+    const iframe = document.getElementById("trailerPlayer");
+
+    input.addEventListener("input", function () {
+      const val = this.value.toLowerCase();
+      list.innerHTML = "";
+
+      if (!val) return;
+
+      const matches = Object.keys(trailers).filter(t => t.toLowerCase().includes(val));
+      matches.slice(0, 10).forEach(title => {
+        const div = document.createElement("div");
+        div.textContent = title;
+        div.onclick = () => {
+          input.value = title;
+          list.innerHTML = "";
+          showTrailer(trailers[title]);
+        };
+        list.appendChild(div);
+      });
+    });
+
+    function showTrailer(link) {
+      console.log('Showing trailer for link:', link);
+      let videoId;
+      
+      if (link.includes('youtube.com/watch?v=')) {
+        videoId = link.split('v=')[1].split('&')[0];
+      } else if (link.includes('youtu.be/')) {
+        videoId = link.split('youtu.be/')[1].split('?')[0];
+      } else if (link.includes('youtube.com/embed/')) {
+        videoId = link.split('embed/')[1].split('?')[0];
+      }
+      
+      if (videoId) {
+        const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+        console.log('Setting iframe src to:', embedUrl);
+        iframe.src = embedUrl;
+        player.style.display = "block";
+      } else {
+        console.error('Could not extract video ID from link:', link);
+      }
+    }
+
+    document.addEventListener("click", function (e) {
+      if (e.target !== input) list.innerHTML = "";
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Recommendation History</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body class="home-bg">
+  <header class="navbar">
+    <div class="logo">RecFlix</div>
+    <nav>
+      <ul>
+        <li class="ll"><a href="/">Home</a></li>
+        {% if user.is_authenticated %}
+        <li class="dropdown-parent">
+          <span class="user-label">Hi, {{ user.first_name }}</span>
+          <div class="dropdown">
+            <a href="/">Home</a>
+            <a href="/playlist">Playlist</a>
+            <a href="/logout">Logout</a>
+          </div>
+        </li>
+        {% else %}
+        <li class="ll"><a href="/login">Login</a></li>
+        <li class="ll"><a href="/register">Register</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+  </header>
+
+  <main class="container">
+    <h2>Your Recommendation History</h2>
+
+    {% if history %}
+    <form action="{% url 'clear_history' %}" method="POST" onsubmit="return confirm('Are you sure you want to clear your history?');">
+      {% csrf_token %}
+      <button type="submit" class="clear-btn">🗑️ Clear History</button>
+    </form>
+
+    <div class="recommend-grid">
+      {% for item in history %}
+      <div class="card">
+        <img src="{{ item.poster }}" alt="{{ item.title }}" style="width: 100%; height: 300px; object-fit: cover;">
+        <p>{{ item.title }} <span style="font-size: 0.8em; color: #aaa;">({{ item.category }})</span></p>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p>No history found.</p>
+    {% endif %}
+  </main>
+
+  <style>
+    .recommend-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 20px;
+      padding: 20px;
+    }
+
+    .card {
+      background: #1a1a1a;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      transition: transform 0.3s ease;
+    }
+
+    .card:hover {
+      transform: scale(1.05);
+    }
+
+    .card p {
+      margin: 10px;
+      color: white;
+      text-align: center;
+      font-size: 1.1em;
+    }
+
+    .clear-btn {
+      background: #e50914;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1em;
+      margin: 20px;
+      transition: background 0.3s ease;
+    }
+
+    .clear-btn:hover {
+      background: #f40612;
+    }
+  </style>
+</body>
+</html>
